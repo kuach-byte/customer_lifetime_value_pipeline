@@ -1,0 +1,44 @@
+version: 2
+
+models:
+  - name: int_retail_filtered
+    description: >
+      Intermediate model that removes invalid transactional records where
+      quantity is positive but unit_price is negative. Ensures only logically
+      consistent sales data is passed downstream.
+
+    columns:
+
+      - name: invoice_no
+        description: Unique invoice identifier for each transaction.
+      
+
+      - name: stock_code
+        description: Product stock code associated with the transaction.
+
+
+      - name: quantity
+        description: Number of units purchased in the transaction.
+
+
+      - name: unit_price
+        description: Price per unit of the product.
+
+      - name: invoice_date
+        description: Timestamp of when the transaction occurred.
+
+
+      - name: customer_id
+        description: Unique identifier for the customer, may be null for some transactions.
+        
+
+      - name: country
+        description: Country where the transaction took place.
+
+      - name: country_invalid
+        description: Flag for invalid country values.
+
+    data_tests:
+
+      - dbt_utils.expression_is_true:
+          expression: "NOT (quantity > 0 AND unit_price < 0)"

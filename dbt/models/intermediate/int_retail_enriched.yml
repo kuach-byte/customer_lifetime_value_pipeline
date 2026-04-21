@@ -1,0 +1,48 @@
+version: 2
+
+models:
+  - name: int_retail_enriched
+    description: |
+      Enriched retail transactions fact table. Adds calculated revenue (quantity × unit_price) to each
+      deduplicated transaction record. Ready for downstream analytics and aggregation.
+
+    config:
+      materialized: table
+
+    columns:
+      - name: invoice_no
+        description: Invoice number (trimmed). Transaction identifier.
+
+      - name: stock_code
+        description: Product stock code (trimmed).
+
+      - name: quantity
+        description: Quantity of product sold per transaction.
+
+      - name: unit_price
+        description: Unit price of product in local currency.
+
+      - name: invoice_date
+        description: Transaction date and time.
+
+      - name: customer_id
+        description: Customer identifier (trimmed), may be null.
+
+      - name: country
+        description: Customer's country of residence.
+
+      - name: country_invalid
+        description: Flag indicating invalid country entries (1 = invalid, 0 = valid).
+
+      - name: revenue
+        description: |
+          Calculated revenue for the transaction line item (quantity × unit_price).
+        data_tests:
+          - not_null
+      
+    data_tests:
+      - dbt_utils.at_least_one:
+          arguments:
+            column_name: revenue
+          config:
+            severity: warn

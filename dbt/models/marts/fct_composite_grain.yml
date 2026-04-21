@@ -1,0 +1,45 @@
+version: 2
+
+models:
+  - name: fct_composite_grain
+    description: |
+      Monthly customer snapshot fact table at grain:
+      (customer_id, snapshot_date).
+
+      Contains lifecycle metrics and activity flags used for RFM / CLV modeling.
+
+    config:
+      materialized: incremental
+      unique_key: ['customer_id', 'snapshot_date']
+
+    tests:
+      # Enforce grain uniqueness
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - customer_id
+            - snapshot_date
+
+    columns:
+
+      - name: customer_id
+        description: Unique identifier for customer
+        tests:
+          - not_null
+          - relationships:
+              to: ref('int_retail_filtered')
+              field: customer_id
+
+      - name: snapshot_date
+        description: Month-level snapshot date
+        tests:
+          - not_null
+
+      - name: had_activity
+        description: Boolean flag indicating if customer had activity in that month
+        tests:
+          - not_null
+
+      - name: months_since_first_purchase
+        description: Number of months since customer's first purchase
+        tests:
+          - not_null

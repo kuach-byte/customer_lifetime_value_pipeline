@@ -1,0 +1,38 @@
+version: 2
+
+models:
+  - name: dim_date_months
+    description: >
+      Monthly date dimension table with a deterministic month index.
+      Used for time-series expansion, cohort analysis, and feature engineering.
+
+    config:
+      materialized: table
+
+    columns:
+
+      - name: month_start
+        description: First day of each month (primary key).
+        tests:
+          - not_null
+          - unique
+
+      - name: month_index
+        description: >
+          Deterministic month index calculated as (year * 12 + month).
+          Used for fast arithmetic in time-based features.
+        tests:
+          - not_null
+          - unique   # important: ensures no duplicate months
+
+      - name: year
+        description: Extracted year from month_start.
+        tests:
+          - not_null
+
+      - name: month_num
+        description: Month number (1–12).
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1,2,3,4,5,6,7,8,9,10,11,12]

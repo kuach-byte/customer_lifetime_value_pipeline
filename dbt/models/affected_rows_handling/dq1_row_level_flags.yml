@@ -1,0 +1,73 @@
+version: 2
+
+models:
+  - name: dq1_row_level_flags
+    description: >
+      Row-level data quality model combining completeness, validity,
+      consistency, and uniqueness checks into a single unified output.
+      Each row is flagged with `affected_row` and assigned an `error_count`,
+      enabling accurate downstream filtering and analysis without double-counting.
+
+    columns:
+
+      - name: invoice_no
+        description: Original invoice identifier from source data.
+
+      - name: stock_code
+        description: Product stock code.
+
+      - name: description
+        description: Product description text.
+
+      - name: quantity
+        description: Quantity of items purchased (positive) or returned (negative).
+
+      - name: invoice_date
+        description: Timestamp of transaction.
+
+      - name: unit_price
+        description: Price per unit of the product.
+
+      - name: country
+        description: Country associated with the transaction.
+
+      # CORE DQ OUTPUTS
+
+      - name: affected_row
+        description: >
+          Binary flag indicating whether a row is affected by ANY data quality issue.
+          1 = at least one DQ rule violated, 0 = fully clean row.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+
+      - name: error_count
+        description: >
+          Total number of data quality rule violations for the row,
+          aggregated across all dimensions.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      - name: dq_checked_at
+        description: Timestamp when DQ checks were computed.
+        data_tests:
+          - not_null
+
+    #  MODEL-LEVEL TESTS
+    data_tests:
+
+      # No negative error counts
+      - dbt_utils.expression_is_true:
+          expression: "error_count >= 0"
+          name: error_count_non_negative
+
+      # affected_row must align with error_count
+      - dbt_utils.expression_is_true:
+          expression: >
+            (affected_row = 1 AND error_count > 0)
+            OR (affected_row = 0 AND error_count = 0)
+          name: affected_row_consistency

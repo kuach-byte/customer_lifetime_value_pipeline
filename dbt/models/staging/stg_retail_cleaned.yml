@@ -1,0 +1,49 @@
+version: 2
+
+models:
+  - name: stg_retail_cleaned
+    description: |
+      Cleaned and standardized online retail transactions.
+
+    config:
+      materialized: view
+
+    columns:
+      - name: invoice_no
+        description: Invoice number (trimmed). Transaction identifier.
+
+      - name: stock_code
+        description: Product stock code (trimmed).
+        data_tests:
+          - not_null
+
+      - name: quantity
+        description: Quantity of product sold per transaction.
+        data_tests:
+          - not_null
+
+      - name: unit_price
+        description: Unit price of product.
+        data_tests:
+          - not_null
+
+      - name: invoice_date
+        description: Transaction timestamp.
+        data_tests:
+          - not_null 
+
+      - name: customer_id
+        description: Customer identifier. May be null.
+
+      - name: country
+        description: Customer country.
+        data_tests:
+          - not_null
+
+      - name: country_invalid
+        description: Flag for invalid country values.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1]
