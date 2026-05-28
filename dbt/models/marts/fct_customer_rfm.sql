@@ -58,14 +58,23 @@ rfm_aggregates AS (
         -- RECENCY
         CASE 
             WHEN b.had_activity THEN 0
-            WHEN MAX(tm.last_invoice_date) IS NOT NULL THEN
-                DATE_PART('day', b.snapshot_date - MAX(tm.last_invoice_date))
+            WHEN MAX(CASE 
+                WHEN tm.txn_month = DATE_TRUNC('month', b.snapshot_date) 
+                THEN tm.last_invoice_date 
+            END) IS NOT NULL THEN
+                DATE_PART('day', b.snapshot_date - MAX(CASE 
+                    WHEN tm.txn_month = DATE_TRUNC('month', b.snapshot_date) 
+                    THEN tm.last_invoice_date 
+                END))
             ELSE NULL
         END AS recency_days,
 
-        -- FREQUENCY (cumulative)
-        GREATEST(SUM(tm.txn_count) - 1, 0) AS frequency,
-
+        -- FREQUENCY
+        COALESCE(SUM(CASE 
+            WHEN tm.txn_month = DATE_TRUNC('month', b.snapshot_date) 
+            THEN tm.txn_count 
+            ELSE 0 
+        END), 0) AS frequency,
         -- MONETARY
         CASE 
             WHEN SUM(tm.txn_count) > 0 THEN
