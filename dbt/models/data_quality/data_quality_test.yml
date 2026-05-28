@@ -1,0 +1,714 @@
+version: 2
+
+models:
+
+  # ============================================================
+  # dq1_completeness
+  # ============================================================
+  - name: dq1_completeness
+    description: >
+      Completeness checks for public.online_retail_raw.
+      Produces one summary row with column-level completeness rates,
+      row-level completeness counts, and audit metadata.
+    config:
+      materialized: table
+
+    columns:
+
+      - name: n_total
+        description: Total number of rows in the source table.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      # ---- Column completeness rates (must be 0–1) ----
+
+      - name: invoice_no_completeness_rate
+        description: Fraction of rows where invoice_no is non-null and non-empty.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 1"
+
+      - name: stock_code_completeness_rate
+        description: Fraction of rows where stock_code is non-null and non-empty.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 1"
+
+      - name: description_completeness_rate
+        description: Fraction of rows where description is non-null.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 1"
+
+      - name: quantity_completeness_rate
+        description: Fraction of rows where quantity is non-null.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 1"
+
+      - name: invoice_date_completeness_rate
+        description: Fraction of rows where invoice_date is non-null.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 1"
+
+      - name: unit_price_completeness_rate
+        description: Fraction of rows where unit_price is non-null and >= 0.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 1"
+
+      - name: customer_id_completeness_rate
+        description: >
+          Always 1.0 by spec — customer_id is nullable and therefore never
+          flagged as incomplete.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1.0]
+
+      - name: country_completeness_rate
+        description: Fraction of rows where country is non-null and non-empty.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 1"
+
+      # ---- Row-level completeness ----
+
+      - name: fully_complete_row_count
+        description: Number of rows that pass all completeness checks.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+          - dbt_utils.expression_is_true:
+              expression: "<= n_total"
+              name: fully_complete_row_count_lte_n_total
+
+      - name: fully_complete_row_rate
+        description: Share of fully-complete rows (fully_complete_row_count / n_total).
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 1"
+
+      - name: incomplete_row_count
+        description: Number of rows that fail at least one completeness check.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+          - dbt_utils.expression_is_true:
+              expression: "= n_total - fully_complete_row_count"
+              name: incomplete_row_count_equals_complement
+
+      # ---- Incomplete counts per column ----
+
+      - name: invoice_no_incomplete_count
+        description: Rows where invoice_no is null or empty.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      - name: stock_code_incomplete_count
+        description: Rows where stock_code is null or empty.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      - name: description_incomplete_count
+        description: Rows where description is null.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      - name: quantity_incomplete_count
+        description: Rows where quantity is null.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      - name: invoice_date_incomplete_count
+        description: Rows where invoice_date is null.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      - name: unit_price_incomplete_count
+        description: Rows where unit_price is null or negative.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      - name: customer_id_incomplete_count
+        description: Always 0 — customer_id is nullable by spec.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0]
+
+      - name: country_incomplete_count
+        description: Rows where country is null or empty.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      # ---- Metadata ----
+
+      - name: dq_model
+        description: Literal identifier tag for this DQ model.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['dq1_completeness']
+
+      - name: run_at
+        description: Timestamp of when the model was last materialized.
+        data_tests:
+          - not_null
+
+    # ---- Model-level (multi-column) tests ----
+    data_tests:
+      # Rate–count cross-checks
+      - dbt_utils.expression_is_true:
+          expression: >
+            ROUND(1.0 - invoice_no_incomplete_count::NUMERIC / NULLIF(n_total,0), 4)
+            = invoice_no_completeness_rate
+          name: invoice_no_rate_derived_correctly
+      - dbt_utils.expression_is_true:
+          expression: >
+            ROUND(1.0 - stock_code_incomplete_count::NUMERIC / NULLIF(n_total,0), 4)
+            = stock_code_completeness_rate
+          name: stock_code_rate_derived_correctly
+      - dbt_utils.expression_is_true:
+          expression: >
+            ROUND(1.0 - country_incomplete_count::NUMERIC / NULLIF(n_total,0), 4)
+            = country_completeness_rate
+          name: country_rate_derived_correctly
+      # The summary model must produce exactly one row
+      - dbt_utils.equal_rowcount:
+          compare_model: ref('dq1_completeness')
+          name: completeness_is_single_row_via_self_check
+
+
+  # ============================================================
+  # dq1_validity
+  # ============================================================
+  - name: dq1_validity
+    description: >
+      Validity checks for public.online_retail_raw.
+      Flags rows that violate format, range, or domain rules per column,
+      then aggregates into validity rates and a row-level fully_valid flag.
+    config:
+      materialized: table
+
+    columns:
+
+      - name: n_total
+        description: Total number of rows in the source table.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      # ---- Invalid counts per column ----
+
+      - name: stock_code_invalid_count
+        description: >
+          Rows where stock_code is null or contains characters outside
+          [A-Za-z0-9 ].
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      - name: invoice_no_invalid_count
+        description: Rows where invoice_no does not match ^C?[0-9]{6}$.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      - name: description_invalid_count
+        description: >
+          Rows where description is null, contains only special characters,
+          or contains 5+ consecutive identical characters.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      - name: quantity_invalid_count
+        description: >
+          Rows where quantity is null, <= 0, or > 10 000 (max_quantity
+          threshold defined in the params CTE).
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      - name: invoice_date_invalid_count
+        description: Rows where invoice_date is null or in the future.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      - name: unit_price_invalid_count
+        description: >
+          Rows where unit_price is null, negative, > 99 999.99, or has more
+          than 2 decimal places.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      # ---- Validity rates per column ----
+
+      - name: country_validity_rate
+        description: Fraction of rows with a valid country.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 1"
+
+      - name: stock_code_validity_rate
+        description: Fraction of rows with a valid stock_code.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 1"
+
+      - name: invoice_no_validity_rate
+        description: Fraction of rows with a valid invoice_no.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 1"
+
+      - name: description_validity_rate
+        description: Fraction of rows with a valid description.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 1"
+
+      - name: quantity_validity_rate
+        description: Fraction of rows with a valid quantity.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 1"
+
+      - name: invoice_date_validity_rate
+        description: Fraction of rows with a valid invoice_date.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 1"
+
+      - name: unit_price_validity_rate
+        description: Fraction of rows with a valid unit_price.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 1"
+
+      # ---- Row-level validity ----
+
+      - name: fully_valid_row_count
+        description: Number of rows that pass every validity check.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+          - dbt_utils.expression_is_true:
+              expression: "<= n_total"
+              name: fully_valid_row_count_lte_n_total
+
+      - name: fully_valid_row_rate
+        description: fully_valid_row_count / n_total.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 1"
+
+      - name: invalid_row_count
+        description: Rows that fail at least one validity check.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+          - dbt_utils.expression_is_true:
+              expression: "= n_total - fully_valid_row_count"
+              name: invalid_row_count_equals_complement
+
+      # ---- Metadata ----
+
+      - name: dq_model
+        description: Literal identifier tag for this DQ model.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['dq1_validity']
+
+      - name: run_at
+        description: Timestamp of when the model was last materialized.
+        data_tests:
+          - not_null
+
+    # ---- Model-level tests ----
+    data_tests:
+      # Rate–count cross-checks
+      - dbt_utils.expression_is_true:
+          expression: >
+            ROUND(1.0 - invoice_no_invalid_count::NUMERIC / NULLIF(n_total,0), 4)
+            = invoice_no_validity_rate
+          name: invoice_no_validity_rate_derived_correctly
+      - dbt_utils.expression_is_true:
+          expression: >
+            ROUND(1.0 - quantity_invalid_count::NUMERIC / NULLIF(n_total,0), 4)
+            = quantity_validity_rate
+          name: quantity_validity_rate_derived_correctly
+      - dbt_utils.expression_is_true:
+          expression: >
+            ROUND(1.0 - unit_price_invalid_count::NUMERIC / NULLIF(n_total,0), 4)
+            = unit_price_validity_rate
+          name: unit_price_validity_rate_derived_correctly
+      # Row-level rate cross-check
+      - dbt_utils.expression_is_true:
+          expression: >
+            ROUND(fully_valid_row_count::NUMERIC / NULLIF(n_total,0), 4)
+            = fully_valid_row_rate
+          name: fully_valid_row_rate_derived_correctly
+
+
+  # ============================================================
+  # dq1_uniqueness
+  # ============================================================
+  - name: dq1_uniqueness
+    description: >
+      Uniqueness checks for public.online_retail_raw.
+      Detects duplicate composite keys (invoice_no, stock_code) and reports
+      group counts, extra row counts, and a uniqueness rate.
+    config:
+      materialized: table
+
+    columns:
+
+      - name: n_total
+        description: >
+          Total rows where both invoice_no and stock_code are non-null
+          (the denominator for uniqueness rate calculations).
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      - name: composite_duplicate_group_count
+        description: >
+          Number of distinct (invoice_no, stock_code) pairs that appear more
+          than once.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      - name: composite_duplicate_row_count
+        description: >
+          Total extra rows beyond the first occurrence across all duplicate
+          groups. Formula: SUM(occurrence_count) - COUNT(*) for groups with
+          occurrence_count > 1.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+          - dbt_utils.expression_is_true:
+              expression: "<= n_total"
+              name: composite_duplicate_row_count_lte_n_total
+          # When there are no duplicates the count must be zero
+          - dbt_utils.expression_is_true:
+              expression: ">= composite_duplicate_group_count"
+              name: duplicate_rows_gte_duplicate_groups
+
+      - name: composite_uniqueness_rate
+        description: >
+          1 - (composite_duplicate_row_count / n_total). Equals 1.0 when
+          every composite key is unique.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 1"
+
+      # ---- Metadata ----
+
+      - name: dq_model
+        description: Literal identifier tag for this DQ model.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['dq1_uniqueness']
+
+      - name: run_at
+        description: Timestamp of when the model was last materialized.
+        data_tests:
+          - not_null
+
+    # ---- Model-level tests ----
+    data_tests:
+      # Rate–count cross-check
+      - dbt_utils.expression_is_true:
+          expression: >
+            ROUND(1.0 - composite_duplicate_row_count::NUMERIC / NULLIF(n_total,0), 4)
+            = composite_uniqueness_rate
+          name: composite_uniqueness_rate_derived_correctly
+      # If no duplicates exist, the rate must be 1.0
+      - dbt_utils.expression_is_true:
+          expression: >
+            (composite_duplicate_group_count = 0 AND composite_uniqueness_rate = 1.0)
+            OR composite_duplicate_group_count > 0
+          name: zero_groups_implies_perfect_uniqueness_rate
+
+
+  # ============================================================
+  # dq1_consistency
+  # ============================================================
+  - name: dq1_consistency
+    description: >
+      Consistency checks for public.online_retail_raw.
+      Rule 1: sale rows (quantity > 0) must have unit_price > 0.
+      Rule 3: return rows (quantity < 0) must have unit_price > 0.
+      Rule 2 (chronological order) is intentionally skipped — no reliable
+      row-order column exists.
+    config:
+      materialized: table
+
+    columns:
+
+      - name: n_total
+        description: Total rows in the source table.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      # ---- Rule 1: sale rows ----
+
+      - name: sale_with_zero_price_count
+        description: >
+          Sale rows (quantity > 0) where unit_price is null or <= 0.
+          Violates the rule that sales must carry a positive price.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+          - dbt_utils.expression_is_true:
+              expression: "<= total_sale_rows"
+              name: sale_failures_lte_total_sale_rows
+
+      - name: total_sale_rows
+        description: Total rows where quantity > 0.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+          - dbt_utils.expression_is_true:
+              expression: "<= n_total"
+              name: total_sale_rows_lte_n_total
+
+      - name: sales_price_consistency_rate
+        description: >
+          1 - (sale_with_zero_price_count / total_sale_rows).
+          Measures the fraction of sale rows with a positive price.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 1"
+
+      # ---- Rule 3: return rows ----
+
+      - name: return_with_nonpositive_price_count
+        description: >
+          Return rows (quantity < 0) where unit_price is null or <= 0.
+          Violates the rule that returns must still carry a positive price.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+          - dbt_utils.expression_is_true:
+              expression: "<= total_return_rows"
+              name: return_failures_lte_total_return_rows
+
+      - name: total_return_rows
+        description: Total rows where quantity < 0.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+          - dbt_utils.expression_is_true:
+              expression: "<= n_total"
+              name: total_return_rows_lte_n_total
+
+      - name: return_price_consistency_rate
+        description: >
+          1 - (return_with_nonpositive_price_count / total_return_rows).
+          Measures the fraction of return rows with a positive price.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 1"
+
+      # ---- Metadata ----
+
+      - name: dq_model
+        description: Literal identifier tag for this DQ model.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['dq1_consistency']
+
+      - name: run_at
+        description: Timestamp of when the model was last materialized.
+        data_tests:
+          - not_null
+
+    # ---- Model-level tests ----
+    data_tests:
+      # Rate–count cross-checks
+      - dbt_utils.expression_is_true:
+          expression: >
+            ROUND(1.0 - sale_with_zero_price_count::NUMERIC / NULLIF(total_sale_rows,0), 4)
+            = sales_price_consistency_rate
+          name: sales_consistency_rate_derived_correctly
+      - dbt_utils.expression_is_true:
+          expression: >
+            ROUND(1.0 - return_with_nonpositive_price_count::NUMERIC / NULLIF(total_return_rows,0), 4)
+            = return_price_consistency_rate
+          name: return_consistency_rate_derived_correctly
+      # Sale + return rows must not exceed total (zero-qty rows make the gap)
+      - dbt_utils.expression_is_true:
+          expression: "total_sale_rows + total_return_rows <= n_total"
+          name: sale_plus_return_rows_lte_n_total
+
+
+  # ============================================================
+  # dq1_summary
+  # ============================================================
+  - name: dq1_summary
+    description: >
+      Unified, analyst-facing DQ report. Unpivots all four dimension models
+      (completeness, validity, uniqueness, consistency) into a single stacked
+      table with one row per (dimension, check_name, metric_name). Includes
+      an overall DQ score row and a PASS / WARN / FAIL status column.
+    config:
+      materialized: table
+
+    columns:
+
+      - name: dimension
+        description: >
+          DQ dimension: completeness | validity | uniqueness | consistency |
+          overall.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - completeness
+                  - validity
+                  - uniqueness
+                  - consistency
+                  - overall
+
+      - name: check_name
+        description: >
+          Human-readable name identifying the specific column or rule being
+          checked (e.g. 'invoice_no', 'quantity>0 → price>0', 'ALL_COLUMNS').
+        data_tests:
+          - not_null
+
+      - name: metric_name
+        description: >
+          Type of metric reported for this row (e.g. 'incomplete_count',
+          'invalid_count', 'duplicate_row_count', 'failing_row_count',
+          'fully_complete_row_count', 'dq_score').
+        data_tests:
+          - not_null
+
+
+      - name: metric_value
+        description: >
+          Raw count or numeric value associated with metric_name.
+          NULL only for the overall dq_score row (which carries only a rate).
+
+
+      - name: rate
+        description: >
+          Dimensionless rate (0–1) for the check.
+          For 'overall / ALL / dq_score', this is the average of all four
+          dimension scores.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 1"
+
+      - name: n_total
+        description: Total rows in the source table at time of run.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      - name: status
+        description: >
+          Threshold-based classification of the rate:
+            PASS  ≥ 0.99
+            WARN  ≥ 0.95 and < 0.99
+            FAIL  < 0.95
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['PASS', 'WARN', 'FAIL']
+
+      - name: run_at
+        description: Timestamp propagated from the underlying dimension models.
+        data_tests:
+          - not_null
+
+    # ---- Model-level tests ----
+    data_tests:
+      
+
+      - dbt_utils.expression_is_true:
+          expression: "metric_value IS NULL OR metric_value >= 0"
+          name: metric_value_non_negative_when_not_null
+
+      - dbt_utils.expression_is_true:
+          expression: >
+            (status = 'PASS' AND rate >= 0.99)
+            OR (status = 'WARN' AND rate >= 0.95 AND rate < 0.99)
+            OR (status = 'FAIL' AND rate < 0.95)
+          name: status_matches_rate_threshold

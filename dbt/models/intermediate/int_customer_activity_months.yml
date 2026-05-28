@@ -1,0 +1,26 @@
+version: 2
+
+models:
+  - name: int_customer_activity_months
+    description: |
+      Deduplicated customer-month activity table.
+      Each row represents a unique (customer_id, activity_month) where at least one transaction occurred.
+
+    columns:
+
+      - name: customer_id
+        description: Unique identifier for the customer.
+        tests:
+          - not_null
+
+      - name: activity_month
+        description: Month (truncated) in which the customer had activity.
+        tests:
+          - not_null
+
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - customer_id
+              - activity_month

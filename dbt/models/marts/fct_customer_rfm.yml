@@ -1,0 +1,57 @@
+version: 2
+
+models:
+  - name: fct_customer_rfm
+    description: |
+      Customer-level RFM metrics calculated at a monthly snapshot grain.
+      Includes recency (days since last purchase), frequency (repeat purchases),
+      and monetary value (avg revenue per transaction).
+
+    columns:
+
+      - name: customer_id
+        description: Unique identifier for the customer
+        tests:
+          - not_null
+
+      - name: snapshot_date
+        description: Monthly snapshot date
+        tests:
+          - not_null
+
+      - name: had_activity
+        description: Whether the customer had activity in the snapshot month
+        tests:
+          - not_null
+
+      - name: months_since_first_purchase
+        description: Number of months since first purchase
+        tests:
+          - not_null
+
+      - name: recency_days
+        description: Days since last purchase relative to snapshot_date
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: "recency_days >= 0 OR recency_days IS NULL"
+
+      - name: frequency
+        description: Number of repeat purchases (txn_count - 1)
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "frequency >= 0"
+
+      - name: monetary_value
+        description: Average revenue per transaction
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: "monetary_value >= 0 OR monetary_value IS NULL"
+
+    tests:
+
+      # Grain test (critical for incrementals)
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - customer_id
+            - snapshot_date

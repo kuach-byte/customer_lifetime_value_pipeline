@@ -1,0 +1,131 @@
+version: 2
+
+models:
+  - name: dq1_usable_data_summary
+    description: >
+      Business-facing data quality summary model that computes the true
+      usable percentage of data based on row-level flags. Includes error
+      distribution, quality grading, and actionable recommendations for
+      dropping or retaining affected rows.
+
+    columns:
+
+      - name: total_rows
+        description: Total number of rows evaluated.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      - name: affected_rows
+        description: Number of rows with at least one data quality issue.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      - name: clean_rows
+        description: Number of rows with zero data quality issues.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+      # CORE METRIC
+
+      - name: pct_usable_data
+        description: >
+          Percentage of fully clean rows (no DQ issues).
+          This is the primary metric for determining data usability.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 100"
+
+      #  DISTRIBUTION
+
+      - name: zero_errors
+        description: Number of rows with zero errors.
+        data_tests:
+          - not_null
+
+      - name: pct_one_error
+        description: Percentage of rows with exactly one error.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 100"
+
+      - name: pct_two_to_three_errors
+        description: Percentage of rows with 2–3 errors.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 100"
+
+      - name: pct_four_plus_errors
+        description: Percentage of rows with 4+ errors.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 100"
+
+      # STATISTICS
+
+      - name: avg_errors_per_affected_row
+        description: Average number of errors among affected rows.
+
+      - name: min_errors
+        description: Minimum number of errors observed in a row.
+        data_tests:
+          - not_null
+
+      - name: max_errors
+        description: Maximum number of errors observed in a row.
+        data_tests:
+          - not_null
+
+      # BUSINESS OUTPUTS
+
+      - name: data_quality_grade
+        description: >
+          Overall quality classification based on usable percentage.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - EXCELLENT
+                  - GOOD
+                  - ACCEPTABLE
+                  - POOR
+                  - UNACCEPTABLE
+
+      - name: drop_strategy_recommendation
+        description: >
+          Recommended action for handling invalid rows based on data quality level.
+        data_tests:
+          - not_null
+
+      - name: actionable_insight
+        description: Human-readable recommendation for stakeholders.
+
+      - name: computed_at
+        description: Timestamp when summary was computed.
+        data_tests:
+          - not_null
+
+    # MODEL-LEVEL TESTS
+    data_tests:
+
+      # Clean + affected must equal total
+      - dbt_utils.expression_is_true:
+          expression: "clean_rows + affected_rows = total_rows"
+          name: row_count_consistency
+
+      # pct_usable_data must match clean_rows
+      - dbt_utils.expression_is_true:
+          expression: >
+            ROUND(100.0 * clean_rows / NULLIF(total_rows, 0), 2)
+            = pct_usable_data
+          name: usable_pct_matches_clean_rows
