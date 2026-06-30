@@ -1,341 +1,69 @@
-# Customer Lifetime Value (CLV) Pipeline
+# Executive Summary
 
-### dbt-Powered Analytics Foundation + ML-Ready Feature Layer
+This repository presents an end-to-end Customer Lifetime Value (CLV) analytics pipeline built on the Online Retail dataset from Kaggle. The project begins by ingesting transactional data into PostgreSQL and transforming it with dbt to produce clean, analysis-ready datasets. Customer-level features are then engineered to support machine learning, where customers are segmented using clustering and multiple CLV prediction models are benchmarked to identify the best-performing model for each customer segment. The selected models are retrained for production, and the resulting analytical marts are served to Power BI, where interactive dashboards translate the model outputs into actionable business insights for customer segmentation, retention, and revenue optimization.
 
----
+## Business Problem
 
-## Overview
+The business lacks a clear understanding of which customers are expected to generate the greatest future value and how marketing and retention resources should be allocated accordingly. By segmenting customers into CLV tiers and behavioral personas, the company aims to identify its most valuable customer groups, understand the contribution of each segment to future revenue, prioritize high-value customers for immediate engagement, and determine which countries present the greatest revenue opportunities.
 
-This project implements a **production-style customer analytics pipeline** to support **Customer Lifetime Value (CLV) modeling**.
+**List of analytical questions:**
 
-It establishes a **clean, scalable feature layer in dbt**, which is extended using Python for **exploratory data analysis (EDA)** and **advanced feature engineering**.
+- Which customers belong to each CLV tier?
+- Which CLV tier contributes the highest predicted revenue?
+- What customer personas exist, and how many customers belong to each?
+- How are CLV tiers distributed across customer personas?
+- How should marketing or retention budgets be allocated across personas based on predicted future value?
+- Which countries present the largest future revenue opportunities?
+- Which customers should be prioritized for immediate retention or marketing campaigns?
 
-The pipeline follows a modern data stack design:
+## Project Architecture
 
-* **dbt** → deterministic transformations & feature generation
-* **Python** → statistical analysis & ML feature engineering
+![Architecture](assets/clv_project_architecture.png)
 
----
+**Workflow:**
 
-## Objectives
+1. Load Online Retail dataset
+2. Store raw data in PostgreSQL
+3. Clean and transform using dbt
+4. Build customer snapshot
+5. Benchmark four CLV models
+6. Cluster customers
+7. Select best model per cluster
+8. Retrain production models
+9. Assign customer personas
+10. Export analytical tables
+11. Build interactive Power BI dashboard
 
-1. Perform comprehensive **data quality validation**
-2. Build a **time-consistent customer feature layer**
-3. Implement **RFM (Recency, Frequency, Monetary) modeling**
-4. Ensure **incremental and scalable transformations**
-5. Enable downstream use cases:
+## Key Results
 
-   * Exploratory Data Analysis (EDA)
-   * Survival analysis (time-to-event modeling)
-   * CLV prediction using machine learning
+- VIP customers contribute the highest predicted revenue and discounted customer lifetime value.
+- The United Kingdom represents the largest revenue opportunity across all countries.
+- Emerging Customers and At-risk Customers receive the highest recommended marketing budget allocations, reflecting their strong growth and retention potential.
+- UK Premium (VIP) customers should be prioritized for immediate engagement to maximize customer lifetime value, improve retention, and protect future revenue.
 
----
+![Screenshot A](assets/a.png)
+![Screenshot B](assets/b.png)
+![Screenshot C](assets/c.png)
+![Screenshot D](assets/d.png)
 
-## Tech Stack
+## Technical Documentation
 
-* **dbt (Postgres adapter)** — transformation layer
-* **PostgreSQL** — data warehouse
-* **Python** — EDA, feature engineering, machine learning
+- Source documentation: [`src/src.md`](src/src.md)
+- dbt models documentation: [`dbt/dbt.md`](dbt/dbt_models.md)
+- Notebooks documentation: [`notebooks/notebooks.md`](notebooks/notebooks.md)
+- Feature engineering documentation: [`assets/feature_engineering.md`](notebooks/feature_engineering.md)
+- Export schemas documentation: [`assets/schemas.md`](powerbi/schemas.md)
 
----
+## Future Improvements
 
-## Data Modeling Approach
+While the project demonstrates a complete end-to-end Customer Lifetime Value (CLV) analytics pipeline, several enhancements could further improve its scalability, predictive capability, and operational maturity.
 
-The project follows a layered architecture:
+- **Automated data pipeline:** Replace the notebook-driven workflow with an orchestrated pipeline using a workflow scheduler such as Apache Airflow or GitHub Actions to automate data ingestion, model retraining, validation, and Power BI data refresh.
+- **Real-time or incremental prediction:** Extend the current snapshot-based approach to support incremental feature updates and near real-time CLV predictions as new transactions become available.
+- **Advanced feature engineering:** Incorporate additional behavioural features such as product category preferences, seasonal purchasing patterns, customer acquisition channels, and customer service interactions to improve predictive performance.
+- **Expanded model benchmarking:** Evaluate additional machine learning approaches, including CatBoost, XGBoost, and ensemble methods, while exploring automated hyperparameter optimisation to improve model accuracy.
+- **Model monitoring:** Implement production monitoring to track prediction drift, feature drift, and model performance over time, with automated alerts when retraining becomes necessary.
+- **Deployment as an analytical service:** Package the prediction pipeline as a REST API or scheduled service so that downstream applications can request updated CLV predictions without executing notebooks manually.
+- **Power BI deployment:** Publish the dashboard to the Power BI Service with scheduled refresh, role-based access control, and row-level security to support enterprise reporting and collaboration.
 
-### 1. Staging Layer (`stg_`)
-
-* Cleans and standardizes raw data
-* Handles:
-
-  * Null values
-  * Type casting
-  * Column selection
-
----
-
-### 2. Intermediate Layer (`int_`)
-
-* Applies business logic
-* Includes:
-
-  * Deduplication
-  * Transaction filtering
-  * Dataset enrichment
-
----
-
-### 3. Dimension Layer (`dim_`)
-
-* Monthly date dimension with deterministic indexing
-* Supports:
-
-  * Time-series expansion
-  * Cohort analysis
-  * Feature engineering
-
----
-
-### 4. Mart Layer (`fct_`)
-
-Analytics-ready feature tables.
-
-#### `fct_composite_grain`
-
-* Core monthly snapshot table
-* Grain: `(customer_id, snapshot_date)`
-* Tracks:
-
-  * Activity flags
-  * Customer lifecycle progression
-  * Months since first purchase
-
----
-
-#### `fct_customer_rfm`
-
-* Computes RFM metrics per snapshot
-
-Features:
-
-* **Recency** — time since last purchase
-* **Frequency** — number of transactions
-* **Monetary** — total revenue
-
----
-
-## Incremental Modeling
-
-Key models are built using **incremental materialization**:
-
-* Avoids full table rebuilds
-* Processes only new snapshot periods
-
-Performance improvement:
-
-> **O(customers × months) → O(new data only)**
-
-
-
-
-## Data Quality & Testing
-
-### Data Quality Framework
-
-The pipeline enforces:
-
-* **Consistency**
-* **Validity**
-* **Uniqueness**
-* **Completeness**
-
----
-
-### dbt Testing
-
-* `not_null` constraints
-* `unique` keys
-* Custom tests (e.g. recency consistency)
-
-This ensures:
-
-* Reliable feature generation
-* Trustworthy downstream ML inputs
-
----
-
-## Data Quality Visualization
-
-![Data Quality Summary](assets/dq_summary.png)
-
-📄 Full Report: [Download PDF](assets/data_quality/dq_summary.pdf)
-
-
-
-
-## Feature Engineering Strategy
-
-### In dbt (Current Scope)
-
-Deterministic, reusable features:
-
-* RFM metrics
-* Customer tenure
-* Activity indicators
-* Time-consistent snapshots
-
----
-
-### In Python (Next Phase)
-
-Advanced feature engineering:
-
-* Distribution analysis (EDA)
-* Log transformations for skewed features
-* Feature scaling & normalization
-* Survival modeling inputs:
-
-  * Time-to-event (T)
-  * Censoring indicators
-
----
-
-### Sample output
-
-SELECT *
-FROM fct_customer_rfm
-ORDER BY customer_id, snapshot_date
-LIMIT 10;
-
-| customer_id | snapshot_date | had_activity | months_since_first_purchase | recency_days   frequency | monetary_value |
-| ----------- | ------------- | ------------ | --------------------------- | ------------ | --------- | -------------- |
-| 13178.0     | 2011-02-01    | true         | 15                          | 0            | 15        | 587.27625      |
-| 12474.0     | 2011-05-01    | true         | 16                          | 0            | 38        | 191.59974      |
-| 13069.0     | 2011-09-01    | true         | 16                          | 0            | 36        | 217.35622      |
-| 12474.0     | 2011-10-01    | true         | 21                          | 0            | 49        | 217.67540      |
-| 12395.0     | 2010-11-01    | false        | 8                           | 2            | 2         | 567.51333      |
-| 12588.0     | 2010-09-01    | false        | 6                           | 119          | 1         | 154.55000      |
-| 12808.0     | 2010-10-01    | false        | 2                           | 0            | 1         | 146.52500      |
-| 13388.0     | 2010-11-01    | false        | 8                           | 199          | 0         | 508.55000      |
-| 13245.0     | 2011-07-01    | false        | 10                          | 270          | 0         | 558.72000      |
-| 12527.0     | 2011-02-01    | true         | 9                           | 0            | 3         | 167.93000      |
-
-
-
-# Data Quality Report — 
-
-## 1. Overview
-
-### Objective
-
-This report evaluates the data quality of UCI online retail  dataset across key dimensions and outlines recommended remediation strategies to
-prepare the data for downstream analytics and modeling.
-
-### Scope
-
-* Source: UCI online retail dataset
-* Tooling:
-
-  * dbt (data quality models)
-  * PostgreSQL (data storage)
-  * Python (data extraction)
-  * Excel (dashboard visualization)
-
----
-
-## 2. Data Quality Framework
-
-The analysis is structured across four core dimensions:
-
-| Dimension    | Description                                      |
-| ------------ | ------------------------------------------------ |
-| Completeness | Presence of required data (null/missing values)  |
-| Validity     | Conformance to expected formats and value ranges |
-| Uniqueness   | Absence of duplicate records                     |
-| Consistency  | Logical coherence across fields                  |
-
----
-
-## 3. Summary of Findings
-
-### Key Insights
-
-* Completeness issues are primarily driven by missing `Description`
-* Uniqueness issues indicate significant duplicate transactions
-* Validity issues are relatively low but present in pricing fields
-* Consistency issues exist in transactional logic
-
-
-
-## 4. Detailed Findings & Remediation
-
----
-
-### 4.1 Completeness
-
-#### Issue: Missing `description`
-
-* **Description:** Records exist without a product decription
-* **Impact:** no impact since it is not analytically critical
-
-#### Handling strategy:
-Removing rows where 'description` is invalid leads to loss of data but the column 'description' is not 
-analytically critical in CLV modeling, Retention analysis and Churn Prediction. So the entire column is getting
-dropped.
-
----
-
-### 4.2 Validity
-
-#### Issue: Invalid 'description' and 'country'
-* **Description:** Records exist with invalid
-* **Impact:** no impact since it is not analytically critical
-
-* **Country:** Records exist with invalid countries according to my data_quality models
-* **Impact:** geography is not really critical for analytics but it does add context,
-
-#### Recommended Handling:
-'description' column will be dropped but invalid country columns will remain flagged
-
-
-### 4.3 Uniqueness
-
-#### Issue: Duplicate Transactions
-
-* **Description:** Duplicate combinations of (`invoice_no`, `stock_code`)
-* **Impact:** Double-counting of sales metrics
-
-#### Recommended Handling:
-
-* Deduplicate using window functions
-
-
-
-### 4.4 Consistency
-
-#### Issue: Inconsistent Transaction Logic
-
-* **Description:** Mismatch between quantity and price logic
-* **Impact:** Leads to incorrect derived metrics
-
-#### Recommended Handling:
-
-for rows with quantity > 0 but unit_price < 0 will be drop since they are like 1% - 2% of the data
-fro rows with quantity < 0, unit_price will be set to 0 since returns don't have negative prices
-
----
-
-## 6. Data Cleaning Strategy
-
-### Proposed Pipeline (dbt)
-
-```text
-raw → staging (cleaning) → intermediate → marts (analytics-ready)
-```
-
-### Steps:
-
-1. Drop column 'description'
-2. Deduplicate transactions
-3. Standardize formats and data types
-4. for rows with quantity > 0 but unit_price < 0 will be drop since they are like 1% - 2% of the data
-5. a new row for revenue will be created
-6. run post-cleaning data quality checks
----
-
-##  Risks & Limitations
-
-* Some anomalies may reflect real business scenarios (e.g., refunds)
-* Dropping records may reduce dataset completeness
-* Assumptions may need validation with domain experts
-
----
-
-
-## Author
-
-**William Kuach Aleu**
-
-* GitHub: https://github.com/kuach-byte
-
----
+These enhancements would transition the project from a portfolio demonstration into a production-ready analytics solution capable of supporting continuous business decision-making.
