@@ -51,7 +51,7 @@ The business lacks a clear understanding of which customers are expected to gene
 - Source documentation: [`src/src.md`](src/src.md)
 - dbt models documentation: [`dbt/dbt.md`](dbt/dbt_models.md)
 - Notebooks documentation: [`notebooks/notebooks.md`](notebooks/notebooks.md)
-- Feature engineering documentation: [`assets/feature_engineering.md`](notebooks/feature_engineering.md)
+- Feature engineering documentation: [`notebooks/feature_engineering.md`](notebooks/feature_engineering.md)
 - Export schemas documentation: [`assets/schemas.md`](powerbi/schemas.md)
 
 ## Future Improvements
